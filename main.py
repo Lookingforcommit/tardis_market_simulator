@@ -29,7 +29,7 @@ def get_init_book(start_date: str, exchange: str, symbols: list[str], channel: s
 START_DATE = "2021-07-01"
 END_DATE = "2021-07-02"
 CHANNELS_AND_SYMBOLS = {
-    "depth": ["btcusdt", "ethusdt"],
+    "live_trades": ["btcusdt", "ethusdt"],
 }
 
 
@@ -132,7 +132,7 @@ class BitmexReplayer(DataReplayer):
                         "size": Decimal(str(level["size"])),
                     }
                     book[side][price] = new_level
-            elif action == "insert":
+            elif action == "insert": # TODO: check if this and partial update can be unified
                 book = self.orderbooks[symbol]
                 for level in message["data"]:
                     price, side = Decimal(str(level["price"])), self.process_side(level["side"])
@@ -178,11 +178,11 @@ class DeribitReplayer(DataReplayer):
         for level in levels:
             book = self.orderbooks[symbol][side]
             action, price, size = level[0], Decimal(str(level[1])), Decimal(str(level[2]))
-            new_level = {
-                "id": None,
-                "size": size
-            }
             if action in ["new", "change"]:
+                new_level = {
+                    "id": None,
+                    "size": size
+                }
                 book[price] = new_level
             elif action == "delete":
                 if price in book.keys():
@@ -209,11 +209,11 @@ class BinanceUSDTFuturesReplayer(DataReplayer):
         for level in levels:
             book = self.orderbooks[symbol][side]
             price, size = Decimal(level[0]), Decimal(level[1])
-            new_level = {
-                "id": None,
-                "size": size
-            }
             if size > 0:
+                new_level = {
+                    "id": None,
+                    "size": size
+                }
                 book[price] = new_level
             else:
                 if price in book.keys():
@@ -255,11 +255,11 @@ class BinanceCOINFuturesReplayer(DataReplayer):
         for level in levels:
             book = self.orderbooks[symbol][side]
             price, size = Decimal(level[0]), Decimal(level[1])
-            new_level = {
-                "id": None,
-                "size": size
-            }
             if size > 0:
+                new_level = {
+                    "id": None,
+                    "size": size
+                }
                 book[price] = new_level
             else:
                 if price in book.keys():
@@ -301,11 +301,11 @@ class BinanceSpotReplayer(DataReplayer):
         for level in levels:
             book = self.orderbooks[symbol][side]
             price, size = Decimal(level[0]), Decimal(level[1])
-            new_level = {
-                "id": None,
-                "size": size
-            }
             if size > 0:
+                new_level = {
+                    "id": None,
+                    "size": size
+                }
                 book[price] = new_level
             else:
                 if price in book.keys():
@@ -336,56 +336,161 @@ class BinanceSpotReplayer(DataReplayer):
 
 
 class OkexFuturesReplayer(DataReplayer):
+    exchange = "okex-futures"
+    orderbook_update_channel = "futures/depth_l2_tbt"
+
     def __init__(self, start_date, end_date, channels_and_symbols):
-        super().__init__(start_date, end_date, "okex-futures", channels_and_symbols)
+        super().__init__(start_date, end_date, channels_and_symbols)
+        self.orderbook_update_channel = "futures_depth_l2_tbt"
+
+    def process_levels(self, levels, symbol, side):
+        book = self.orderbooks[symbol][side]
+        for level in levels:
+            price, size = Decimal(level[0]), Decimal(level[1])
+            if size > 0:
+                new_level = {
+                    "id": None,
+                    "size": size
+                }
+                book[price] = new_level
+            else:
+                if price in book.keys():
+                    book.pop(price)
 
     def process_message(self, message):
-        channel = message["table"].split("/")[1]
+        channel = message["table"].replace("/", "_")
         return channel, message
 
     def process_book_update(self, message):
-        pass
+        data = message["data"]
+        for update in data:
+            symbol = update["instrument_id"]
+            self.process_levels(update["bids"], symbol, "bids")
+            self.process_levels(update["asks"], symbol, "asks")
 
 
 class OkexSwapReplayer(DataReplayer):
+    exchange = "okex-swap"
+    orderbook_update_channel = "swap/depth_l2_tbt"
+
     def __init__(self, start_date, end_date, channels_and_symbols):
-        super().__init__(start_date, end_date, "okex-swap", channels_and_symbols)
+        super().__init__(start_date, end_date, channels_and_symbols)
+        self.orderbook_update_channel = "swap_depth_l2_tbt"
+
+    def process_levels(self, levels, symbol, side):
+        book = self.orderbooks[symbol][side]
+        for level in levels:
+            price, size = Decimal(level[0]), Decimal(level[1])
+            if size > 0:
+                new_level = {
+                    "id": None,
+                    "size": size
+                }
+                book[price] = new_level
+            else:
+                if price in book.keys():
+                    book.pop(price)
 
     def process_message(self, message):
-        channel = message["table"].split("/")[1]
+        channel = message["table"].replace("/", "_")
         return channel, message
 
     def process_book_update(self, message):
-        pass
+        data = message["data"]
+        for update in data:
+            symbol = update["instrument_id"]
+            self.process_levels(update["bids"], symbol, "bids")
+            self.process_levels(update["asks"], symbol, "asks")
 
 
 class OkexOptionsReplayer(DataReplayer):
+    exchange = "okex-options"
+    orderbook_update_channel = "option/depth_l2_tbt"
+
     def __init__(self, start_date, end_date, channels_and_symbols):
-        super().__init__(start_date, end_date, "okex-options", channels_and_symbols)
+        super().__init__(start_date, end_date, channels_and_symbols)
+        self.orderbook_update_channel = "option_depth_l2_tbt"
+
+    def process_levels(self, levels, symbol, side):
+        book = self.orderbooks[symbol][side]
+        for level in levels:
+            price, size = Decimal(level[0]), Decimal(level[1])
+            if size > 0:
+                new_level = {
+                    "id": None,
+                    "size": size
+                }
+                book[price] = new_level
+            else:
+                if price in book.keys():
+                    book.pop(price)
 
     def process_message(self, message):
-        channel = message["table"].split("/")[1]
+        channel = message["table"].replace("/", "_")
         return channel, message
 
     def process_book_update(self, message):
-        pass
+        data = message["data"]
+        for update in data:
+            symbol = update["instrument_id"]
+            self.process_levels(update["bids"], symbol, "bids")
+            self.process_levels(update["asks"], symbol, "asks")
 
 
 class OkexSpotReplayer(DataReplayer):
+    exchange = "okex"
+    orderbook_update_channel = "spot/depth_l2_tbt"
+
     def __init__(self, start_date, end_date, channels_and_symbols):
-        super().__init__(start_date, end_date, "okex", channels_and_symbols)
+        super().__init__(start_date, end_date, channels_and_symbols)
+        self.orderbook_update_channel = "spot_depth_l2_tbt"
+
+    def process_levels(self, levels, symbol, side):
+        book = self.orderbooks[symbol][side]
+        for level in levels:
+            price, size = Decimal(level[0]), Decimal(level[1])
+            if size > 0:
+                new_level = {
+                    "id": None,
+                    "size": size
+                }
+                book[price] = new_level
+            else:
+                if price in book.keys():
+                    book.pop(price)
 
     def process_message(self, message):
-        channel = message["table"].split("/")[1]
+        channel = message["table"].replace("/", "_")
         return channel, message
 
     def process_book_update(self, message):
-        pass
+        data = message["data"]
+        for update in data:
+            symbol = update["instrument_id"]
+            self.process_levels(update["bids"], symbol, "bids")
+            self.process_levels(update["asks"], symbol, "asks")
 
 
 class HuobiFuturesReplayer(DataReplayer):
+    exchange = "huobi-dm"
+    orderbook_update_channel = "depth"
+
     def __init__(self, start_date, end_date, channels_and_symbols):
-        super().__init__(start_date, end_date, "huobi-dm", channels_and_symbols)
+        super().__init__(start_date, end_date, channels_and_symbols)
+
+    def process_levels(self, levels, symbol, side):
+        book = self.orderbooks[symbol][side]
+        for level in levels:
+            price, size = Decimal(str(level[0])), Decimal(str(level[1]))
+            if size > 0:
+                new_level = {
+                    "id": None,
+                    "size": size
+                }
+                book[price] = new_level
+            else:
+                if price in book.keys():
+                    book.pop(price)
 
     def process_message(self, message):
         if "ch" in message.keys():
@@ -401,12 +506,32 @@ class HuobiFuturesReplayer(DataReplayer):
         return channel, message
 
     def process_book_update(self, message):
-        pass
+        symbol = message["ch"].split(".")[1]
+        data = message["tick"]
+        self.process_levels(data["bids"], symbol, "bids")
+        self.process_levels(data["asks"], symbol, "asks")
 
 
 class HuobiCOINSwapReplayer(DataReplayer):
+    exchange = "huobi-dm-swap"
+    orderbook_update_channel = "depth"
+
     def __init__(self, start_date, end_date, channels_and_symbols):
-        super().__init__(start_date, end_date, "huobi-dm-swap", channels_and_symbols)
+        super().__init__(start_date, end_date, channels_and_symbols)
+
+    def process_levels(self, levels, symbol, side):
+        book = self.orderbooks[symbol][side]
+        for level in levels:
+            price, size = Decimal(str(level[0])), Decimal(str(level[1]))
+            if size > 0:
+                new_level = {
+                    "id": None,
+                    "size": size
+                }
+                book[price] = new_level
+            else:
+                if price in book.keys():
+                    book.pop(price)
 
     def process_message(self, message):
         if "ch" in message.keys():
@@ -422,12 +547,32 @@ class HuobiCOINSwapReplayer(DataReplayer):
         return channel, message
 
     def process_book_update(self, message):
-        pass
+        symbol = message["ch"].split(".")[1]
+        data = message["tick"]
+        self.process_levels(data["bids"], symbol, "bids")
+        self.process_levels(data["asks"], symbol, "asks")
 
 
 class HuobiUSDTSwapReplayer(DataReplayer):
+    exchange = "huobi-dm-linear-swap"
+    orderbook_update_channel = "depth"
+
     def __init__(self, start_date, end_date, channels_and_symbols):
-        super().__init__(start_date, end_date, "huobi-dm-linear-swap", channels_and_symbols)
+        super().__init__(start_date, end_date, channels_and_symbols)
+
+    def process_levels(self, levels, symbol, side):
+        book = self.orderbooks[symbol][side]
+        for level in levels:
+            price, size = Decimal(str(level[0])), Decimal(str(level[1]))
+            if size > 0:
+                new_level = {
+                    "id": None,
+                    "size": size
+                }
+                book[price] = new_level
+            else:
+                if price in book.keys():
+                    book.pop(price)
 
     def process_message(self, message):
         if "ch" in message.keys():
@@ -443,12 +588,32 @@ class HuobiUSDTSwapReplayer(DataReplayer):
         return channel, message
 
     def process_book_update(self, message):
-        pass
+        symbol = message["ch"].split(".")[1]
+        data = message["tick"]
+        self.process_levels(data["bids"], symbol, "bids")
+        self.process_levels(data["asks"], symbol, "asks")
 
 
 class HuobiSpotReplayer(DataReplayer):
+    exchange = "huobi"
+    orderbook_update_channel = "mbp"
+
     def __init__(self, start_date, end_date, channels_and_symbols):
-        super().__init__(start_date, end_date, "huobi", channels_and_symbols)
+        super().__init__(start_date, end_date, channels_and_symbols)
+
+    def process_levels(self, levels, symbol, side):
+        book = self.orderbooks[symbol][side]
+        for level in levels:
+            price, size = Decimal(str(level[0])), Decimal(str(level[1]))
+            if size > 0:
+                new_level = {
+                    "id": None,
+                    "size": size
+                }
+                book[price] = new_level
+            else:
+                if price in book.keys():
+                    book.pop(price)
 
     def process_message(self, message):
         if "ch" in message.keys():
@@ -464,48 +629,203 @@ class HuobiSpotReplayer(DataReplayer):
         return channel, message
 
     def process_book_update(self, message):
-        pass
+        if "ch" in message.keys():
+            symbol = message["ch"].split(".")[1]
+            data = message["tick"]
+            self.process_levels(data["bids"], symbol, "bids")
+            self.process_levels(data["asks"], symbol, "asks")
+        elif "rep" in message.keys():
+            symbol = message["rep"].split(".")[1]
+            data = message["data"]
+            self.process_levels(data["bids"], symbol, "bids")
+            self.process_levels(data["asks"], symbol, "asks")
+        else:
+            assert KeyError(f"Unknown format of orderbook update {message}")
 
 
 class CoinbaseReplayer(DataReplayer):
+    exchange = "coinbase"
+    orderbook_update_channel = "l2update"
+
     def __init__(self, start_date, end_date, channels_and_symbols):
-        super().__init__(start_date, end_date, "coinbase", channels_and_symbols)
+        super().__init__(start_date, end_date, channels_and_symbols)
+        self.get_init_book()
+
+    @staticmethod
+    def process_side(side):
+        if side == "Buy":
+            return "bids"
+        else:
+            return "asks"
+
+    def process_levels(self, levels, symbol, side):
+        book = self.orderbooks[symbol][side]
+        for level in levels:
+            price, size = Decimal(level[0]), Decimal(level[1])
+            if size > 0:
+                new_level = {
+                    "id": None,
+                    "size": size
+                }
+                book[price] = new_level
+            else:
+                if price in book.keys():
+                    book.pop(price)
+
+    def get_init_book(self):
+        first_minute = get_init_book(self.start_date, self.exchange, self.subscribed_symbols, "snapshot")
+        unprocessed_symbols = set(self.subscribed_symbols)
+        for update in first_minute:
+            symbol = update["product_id"]
+            if symbol in unprocessed_symbols:
+                unprocessed_symbols.remove(symbol)
+                self.process_levels(update["bids"], symbol, "bids")
+                self.process_levels(update["asks"], symbol, "asks")
+                if len(unprocessed_symbols) == 0:
+                    break
 
     def process_message(self, message):
         channel = message["type"]
         return channel, message
 
     def process_book_update(self, message):
-        pass
+        symbol = message["product_id"]
+        data = message["changes"]
+        new_levels = {"bids": [], "asks": []}
+        for level in data:
+            side = self.process_side(level.pop(0))
+            new_levels[side].append(level)
+        self.process_levels(new_levels["bids"], symbol, "bids")
+        self.process_levels(new_levels["asks"], symbol, "asks")
 
 
 class KrakenFuturesReplayer(DataReplayer):
+    exchange = "cryptofacilities"
+    orderbook_update_channel = "book"
+
     def __init__(self, start_date, end_date, channels_and_symbols):
-        super().__init__(start_date, end_date, "cryptofacilities", channels_and_symbols)
+        super().__init__(start_date, end_date, channels_and_symbols)
+        self.get_init_book()
+
+    @staticmethod
+    def process_side(side):
+        if side == "Buy":
+            return "bids"
+        else:
+            return "asks"
+
+    def process_levels(self, levels, symbol, side):
+        book = self.orderbooks[symbol][side]
+        for level in levels:
+            price, size = Decimal(str(level["price"])), Decimal(str(level["qty"]))
+            if size > 0:
+                new_level = {
+                    "id": None,
+                    "size": size
+                }
+                book[price] = new_level
+            else:
+                if price in book.keys():
+                    book.pop(price)
+
+    def get_init_book(self):
+        first_minute = get_init_book(self.start_date, self.exchange, self.subscribed_symbols, "book_snapshot")
+        unprocessed_symbols = set(self.subscribed_symbols)
+        for update in first_minute:
+            symbol = update["product_id"]
+            if symbol in unprocessed_symbols:
+                unprocessed_symbols.remove(symbol)
+                self.process_levels(update["bids"], symbol, "bids")
+                self.process_levels(update["asks"], symbol, "asks")
+                if len(unprocessed_symbols) == 0:
+                    break
 
     def process_message(self, message):
         channel = message["feed"]
         return channel, message
 
     def process_book_update(self, message):
-        pass
+        if "event" not in message.keys():
+            level = {
+                "price": message["price"],
+                "qty": message["qty"]
+            }
+            levels = [level]
+            symbol = message["product_id"]
+            self.process_levels(levels, symbol, self.process_side(message["side"]))
 
 
 class KrakenSpotReplayer(DataReplayer):
+    exchange = "kraken"
+    orderbook_update_channel = "book"
+
     def __init__(self, start_date, end_date, channels_and_symbols):
-        super().__init__(start_date, end_date, "kraken", channels_and_symbols)
+        super().__init__(start_date, end_date, channels_and_symbols)
+
+    def process_levels(self, levels, symbol, side):
+        book = self.orderbooks[symbol][side]
+        for level in levels:
+            price, size = Decimal(level[0]), Decimal(level[1])
+            if size > 0:
+                new_level = {
+                    "id": None,
+                    "size": size
+                }
+                book[price] = new_level
+            else:
+                if price in book.keys():
+                    book.pop(price)
 
     def process_message(self, message):
-        channel = message[2]
+        channel = message[-2]
+        if "book" in channel:
+            channel = "book"
         return channel, message
 
+    def process_side_update(self, update: dict, symbol: str):
+        if "as" in update.keys() or "bs" in update.keys():
+            if "bs" in update.keys():
+                self.process_levels(update["bs"], symbol, "bids")
+            if "as" in update.keys():
+                self.process_levels(update["as"], symbol, "asks")
+        elif "b" in update.keys():
+            self.process_levels(update["b"], symbol, "bids")
+        elif "a" in update.keys():
+            self.process_levels(update["a"], symbol, "asks")
+        else:
+            assert KeyError(f"Unknown format of orderbook update {update}")
+
     def process_book_update(self, message):
-        pass
+        symbol = message[-1]
+        if len(message) == 4:
+            self.process_side_update(message[1], symbol)
+        elif len(message) == 5:
+            self.process_side_update(message[1], symbol)
+            self.process_side_update(message[2], symbol)
+        else:
+            assert KeyError("Unknown format of orderbook update " + message)
 
 
 class BitstampReplayer(DataReplayer):
+    exchange = "bitstamp"
+    orderbook_update_channel = "diff_order_book"
+
     def __init__(self, start_date, end_date, channels_and_symbols):
-        super().__init__(start_date, end_date, "bitstamp", channels_and_symbols)
+        super().__init__(start_date, end_date, channels_and_symbols)
+
+    def process_levels(self, levels, symbol, side):
+        book = self.orderbooks[symbol][side]
+        for level in levels:
+            price, size = Decimal(level[0]), Decimal(level[1])
+            if size > 0:
+                new_level = {
+                    "id": None,
+                    "size": size
+                }
+                book[price] = new_level
+            else:
+                if price in book.keys():
+                    book.pop(price)
 
     def process_message(self, message):
         channel = message["channel"].split("_")[:-1]
@@ -513,7 +833,11 @@ class BitstampReplayer(DataReplayer):
         return channel, message
 
     def process_book_update(self, message):
-        pass
+        if message["event"] in ["data", "snapshot"]:
+            data = message["data"]
+            symbol = message["channel"].split("_")[-1]
+            self.process_levels(data["bids"], symbol, "bids")
+            self.process_levels(data["asks"], symbol, "asks")
 
 
 class OrderManager:
@@ -529,5 +853,5 @@ class OrderManager:
 
 
 strategy = ExampleStrategy()
-replayer = BinanceSpotReplayer(START_DATE, END_DATE, CHANNELS_AND_SYMBOLS)
+replayer = BitstampReplayer(START_DATE, END_DATE, CHANNELS_AND_SYMBOLS)
 asyncio.run(replayer.replay(strategy))
