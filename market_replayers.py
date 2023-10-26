@@ -63,7 +63,7 @@ class DataReplayer(ABC):
     def process_book_update(self, message):
         pass
 
-    def update_orders_status(self, strategy, symbol, timestamp):  # TODO: test, add dict check for channels
+    def update_orders_status(self, strategy, symbol, timestamp):  # TODO: add dict check for channels
         db_manager = self.db_manager
         active_orders = db_manager.get_active_orders_by_symbol(symbol)
         for order in active_orders:
@@ -75,11 +75,11 @@ class DataReplayer(ABC):
                 if position_func != 0:
                     position_func(position_upd)
                 if new_order["status"] == "filled":
-                    order_completion_func = getattr(strategy, "on_order_completion", 0)  # TODO: test
+                    order_completion_func = getattr(strategy, "on_order_completion", 0)
                     if order_completion_func != 0:
                         order_completion_func(order_upd)
                 else:
-                    order_fill_func = getattr(strategy, "on_order_fill", 0)  # TODO: test
+                    order_fill_func = getattr(strategy, "on_order_fill", 0)
                     if order_fill_func != 0:
                         order_fill_func(order_upd)
 

@@ -136,7 +136,7 @@ class DBManager:
             cur.execute(query, (symbol,))
             con.commit()
 
-    def change_position(self, symbol: str, timestamp: Union[datetime, str], **kwargs):  # TODO: add docstrings, shorts processing
+    def change_position(self, symbol: str, timestamp: Union[datetime, str], **kwargs):  # TODO: add docstrings
         kwargs["upd_timestamp"] = timestamp
         keys, values = kwargs.keys(), kwargs.values()
         upd_columns = ",".join([f"{key} = ?" for key in keys])
